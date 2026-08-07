@@ -1,8 +1,12 @@
-// Shared password for the Admin (approver) login path — unlocks Approvals,
-// Update Residents, and Settings. Same shape as supervisorAuth.ts; kept as a
-// separate store/key so the two passwords are independent.
+// Admin password — shared with the website's admin login, not just this
+// machine. Stored as a SHA-256 hash in Firestore (appSettings/sharedAdmin)
+// so changing it in either place (desktop Settings or the website) keeps
+// both in sync.
 
-const STORAGE_KEY = 'mispace_pg_admin_password_hash'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { db } from './firebase'
+
+const DOC_REF = () => doc(db, 'appSettings', 'sharedAdmin')
 
 async function sha256(text: string): Promise<string> {
   const data = new TextEncoder().encode(text)
@@ -12,16 +16,13 @@ async function sha256(text: string): Promise<string> {
     .join('')
 }
 
-export function hasAdminPassword(): boolean {
-  return Boolean(localStorage.getItem(STORAGE_KEY))
-}
-
 export async function setAdminPassword(password: string): Promise<void> {
-  localStorage.setItem(STORAGE_KEY, await sha256(password))
+  await setDoc(DOC_REF(), { adminPasswordHash: await sha256(password) }, { merge: true })
 }
 
 export async function checkAdminPassword(password: string): Promise<boolean> {
-  const stored = localStorage.getItem(STORAGE_KEY)
+  const snap = await getDoc(DOC_REF())
+  const stored = snap.exists() ? (snap.data().adminPasswordHash as string | undefined) : undefined
   if (!stored) return false
   return (await sha256(password)) === stored
 }

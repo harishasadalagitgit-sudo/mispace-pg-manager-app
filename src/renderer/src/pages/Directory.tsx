@@ -3,8 +3,15 @@ import { doc, setDoc, updateDoc } from 'firebase/firestore'
 import { useSearchParams } from 'react-router-dom'
 import { db } from '../lib/firebase'
 import { useCollection } from '../hooks/useCollection'
-import { Booking, WebsiteEmployee, WebsiteEnquiry, WebsiteResident, WebsiteRoom } from '../lib/types'
-import { nextDueDate } from '../lib/rentCalc'
+import {
+  Booking,
+  WebsiteEmployee,
+  WebsiteEnquiry,
+  WebsiteIncomingPayment,
+  WebsiteResident,
+  WebsiteRoom
+} from '../lib/types'
+import { calculateResidentBalance, nextDueDate } from '../lib/rentCalc'
 import { showToast } from '../lib/toast'
 import { useAuth } from '../lib/auth'
 
@@ -39,6 +46,8 @@ export default function Directory(): React.JSX.Element {
     loading: enquiriesLoading,
     refetch: refetchEnquiries
   } = useCollection<WebsiteEnquiry>('enquiries')
+  const { data: incomingPayments } = useCollection<WebsiteIncomingPayment>('incomingPayments')
+  const [recalculating, setRecalculating] = useState(false)
 
   function refreshAll(): void {
     refetchResidents()
@@ -74,6 +83,17 @@ export default function Directory(): React.JSX.Element {
       )
       .sort((a, b) => Number(a.roomNum) - Number(b.roomNum))
   }, [residents, search, showAllResidents])
+
+  // Always across every resident with a balance, independent of the
+  // search box / "show all" toggle — a stable running total.
+  const residentsWithBalance = useMemo(
+    () => residents.filter((r) => (r.balanceAmount || 0) > 0),
+    [residents]
+  )
+  const totalOutstandingBalance = residentsWithBalance.reduce(
+    (sum, r) => sum + (r.balanceAmount || 0),
+    0
+  )
 
   const pendingBookings = useMemo(
     () =>
@@ -165,6 +185,40 @@ export default function Directory(): React.JSX.Element {
     }
   }
 
+  // Recomputes every resident's balanceAmount from scratch (months elapsed
+  // since joining x rent, minus rent actually paid — same formula used on
+  // income approval) — fixes drift from historical data corrections.
+  async function recalculateBalances(): Promise<void> {
+    setRecalculating(true)
+    try {
+      let updated = 0
+      for (const r of residents) {
+        if (!r.joiningDate) continue
+        const priorPaid = incomingPayments
+          .filter(
+            (p) =>
+              p.roomNum === r.roomNum &&
+              p.bedNum === r.bedNum &&
+              p.paymentType === 'Hostel Resident Monthly'
+          )
+          .reduce((sum, p) => sum + (p.amount || 0), 0)
+        const correctBalance = calculateResidentBalance(r.rentAmount || 0, r.joiningDate, priorPaid)
+        if (correctBalance !== (r.balanceAmount || 0)) {
+          await updateDoc(doc(db, 'residents', r.id), { balanceAmount: correctBalance })
+          updated++
+        }
+      }
+      showToast(
+        updated > 0 ? `Recalculated ${updated} resident balance${updated === 1 ? '' : 's'}` : 'All balances already correct'
+      )
+    } catch (err) {
+      console.error(err)
+      showToast('Failed to recalculate balances: ' + (err as Error).message, 'error')
+    } finally {
+      setRecalculating(false)
+    }
+  }
+
   async function changeEnquiryStatus(
     enquiryId: string,
     status: WebsiteEnquiry['status']
@@ -210,6 +264,15 @@ export default function Directory(): React.JSX.Element {
             {showAllResidents ? 'Show only pending balance' : 'Show all residents'}
           </button>
         )}
+        {tab === 'residents' && (
+          <button
+            className="btn btn-secondary"
+            onClick={recalculateBalances}
+            disabled={recalculating}
+          >
+            {recalculating ? 'Recalculating…' : 'Recalculate balances'}
+          </button>
+        )}
         {tab === 'enquiries' && (
           <button
             className="btn btn-secondary"
@@ -228,6 +291,14 @@ export default function Directory(): React.JSX.Element {
           Refresh
         </button>
       </div>
+
+      {tab === 'residents' && residentsWithBalance.length > 0 && (
+        <div className="card" style={{ borderColor: 'var(--danger)' }}>
+          ⚠ <strong>{residentsWithBalance.length}</strong> resident
+          {residentsWithBalance.length === 1 ? '' : 's'} owe a total of{' '}
+          <strong>₹{totalOutstandingBalance.toLocaleString()}</strong> in outstanding rent balance.
+        </div>
+      )}
 
       <div className="card table-scroll">
         {tab === 'residents' &&

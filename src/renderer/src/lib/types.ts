@@ -355,4 +355,5 @@ export interface DashboardAlertState {
 export interface AppSettings {
   id?: string
   expenseAlertThreshold?: number
+  adminPasswordHash?: string // doc id "sharedAdmin" — shared with the website's admin login
 }

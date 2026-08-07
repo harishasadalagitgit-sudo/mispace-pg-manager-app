@@ -1,15 +1,23 @@
 import { FormEvent, useState } from 'react'
-import { hasAdminPassword, setAdminPassword } from '../lib/adminAuth'
+import { setAdminPassword } from '../lib/adminAuth'
 import { hasSupervisorPassword } from '../lib/supervisorAuth'
 import { useAuth } from '../lib/auth'
+import { useCollection } from '../hooks/useCollection'
+import { AppSettings } from '../lib/types'
 
 type Tab = 'supervisor' | 'admin'
 
 export default function LoginScreen(): React.JSX.Element {
   const { loginSupervisor, loginAdmin } = useAuth()
-  const needsAdminSetup = !hasAdminPassword()
+  // Admin password is shared with the website (appSettings/sharedAdmin) — it
+  // only needs "first time setup" here if that shared doc has never been set.
+  const { data: appSettings, loading: settingsLoading } = useCollection<AppSettings>('appSettings')
+  const hasSharedAdminPassword = Boolean(
+    appSettings.find((s) => s.id === 'sharedAdmin')?.adminPasswordHash
+  )
+  const needsAdminSetup = !settingsLoading && !hasSharedAdminPassword
 
-  const [tab, setTab] = useState<Tab>(needsAdminSetup ? 'admin' : 'supervisor')
+  const [tab, setTab] = useState<Tab>('supervisor')
   const [supervisorPw, setSupervisorPw] = useState('')
   const [adminPw, setAdminPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
@@ -53,6 +61,17 @@ export default function LoginScreen(): React.JSX.Element {
     const ok = await loginAdmin(adminPw)
     setBusy(false)
     if (!ok) setError('Incorrect password')
+  }
+
+  if (settingsLoading) {
+    return (
+      <div className="lock-screen">
+        <div className="page-header">
+          <h1>MiSpace PG</h1>
+          <p>Loading…</p>
+        </div>
+      </div>
+    )
   }
 
   return (

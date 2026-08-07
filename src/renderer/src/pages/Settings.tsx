@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react'
 import { doc, setDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { hasAdminPassword, setAdminPassword } from '../lib/adminAuth'
+import { setAdminPassword } from '../lib/adminAuth'
 import { hasSupervisorPassword, setSupervisorPassword } from '../lib/supervisorAuth'
 import { getCurrentUserName, setCurrentUserName } from '../lib/session'
 import { showToast } from '../lib/toast'
@@ -23,6 +23,9 @@ export default function Settings(): React.JSX.Element {
     appSettings.find((s) => s.id === 'dashboard')?.expenseAlertThreshold ??
     DEFAULT_EXPENSE_ALERT_THRESHOLD
   const [thresholdInput, setThresholdInput] = useState(String(expenseAlertThreshold))
+  const hasSharedAdminPassword = Boolean(
+    appSettings.find((s) => s.id === 'sharedAdmin')?.adminPasswordHash
+  )
 
   async function saveExpenseAlertThreshold(e: FormEvent): Promise<void> {
     e.preventDefault()
@@ -65,10 +68,15 @@ export default function Settings(): React.JSX.Element {
       showToast('Passwords do not match', 'error')
       return
     }
-    await setAdminPassword(adminPw1)
-    setAdminPw1('')
-    setAdminPw2('')
-    showToast('Admin password updated on this machine')
+    try {
+      await setAdminPassword(adminPw1)
+      setAdminPw1('')
+      setAdminPw2('')
+      showToast('Admin password updated — also changed on the website')
+    } catch (err) {
+      console.error(err)
+      showToast('Failed to update admin password: ' + (err as Error).message, 'error')
+    }
   }
 
   async function saveSupervisorPassword(e: FormEvent): Promise<void> {
@@ -124,8 +132,8 @@ export default function Settings(): React.JSX.Element {
         <div className="page-header" style={{ marginBottom: 12 }}>
           <h1 style={{ fontSize: 16 }}>Admin password</h1>
           <p>
-            {hasAdminPassword()
-              ? 'Shared by whoever needs to approve entries, edit residents, or change settings.'
+            {hasSharedAdminPassword
+              ? 'Shared with the website admin login too — changing it here changes it there.'
               : 'Not set yet.'}
           </p>
         </div>
