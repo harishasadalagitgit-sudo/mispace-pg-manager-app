@@ -154,7 +154,7 @@ export interface WebsiteEnquiry {
   expectedJoiningDate: string
   sharingInterest: '4room share' | '5room share'
   submittedAt: string
-  status: 'Pending' | 'Contacted' | 'Closed'
+  status: 'Pending' | 'Contacted' | 'Closed' | 'Elapsed'
 }
 
 export type WebsiteExpenseType =

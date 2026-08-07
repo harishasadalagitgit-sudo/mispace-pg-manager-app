@@ -52,6 +52,7 @@ export default function Directory(): React.JSX.Element {
   const initialTab = VALID_TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : 'residents'
   const [tab, setTab] = useState<Tab>(initialTab)
   const [search, setSearch] = useState('')
+  const [showContacted, setShowContacted] = useState(false)
 
   const sortedRooms = useMemo(
     () => [...rooms].sort((a, b) => Number(a.roomNum) - Number(b.roomNum)),
@@ -137,13 +138,19 @@ export default function Directory(): React.JSX.Element {
     return enquiries
       .filter(
         (e) =>
+          e.status === 'Pending' ||
+          e.status === 'Elapsed' ||
+          (showContacted && e.status === 'Contacted')
+      )
+      .filter(
+        (e) =>
           !q ||
           e.name?.toLowerCase().includes(q) ||
           e.email?.toLowerCase().includes(q) ||
           e.phone?.includes(q)
       )
       .sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1))
-  }, [enquiries, search])
+  }, [enquiries, search, showContacted])
 
   async function changeCapacity(roomNum: string, newCapacity: number): Promise<void> {
     try {
@@ -195,6 +202,14 @@ export default function Directory(): React.JSX.Element {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        {tab === 'enquiries' && (
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowContacted(!showContacted)}
+          >
+            {showContacted ? 'Hide contacted' : 'Show contacted too'}
+          </button>
+        )}
         <button
           className="btn btn-secondary"
           onClick={refreshAll}
@@ -422,7 +437,7 @@ export default function Directory(): React.JSX.Element {
                             changeEnquiryStatus(en.id, e.target.value as WebsiteEnquiry['status'])
                           }
                         >
-                          {(['Pending', 'Contacted', 'Closed'] as const).map((s) => (
+                          {(['Pending', 'Contacted', 'Elapsed', 'Closed'] as const).map((s) => (
                             <option key={s} value={s}>
                               {s}
                             </option>
