@@ -1,18 +1,44 @@
 import { FormEvent, useState } from 'react'
+import { doc, setDoc } from 'firebase/firestore'
+import { db } from '../lib/firebase'
 import { hasAdminPassword, setAdminPassword } from '../lib/adminAuth'
 import { hasSupervisorPassword, setSupervisorPassword } from '../lib/supervisorAuth'
 import { getCurrentUserName, setCurrentUserName } from '../lib/session'
 import { showToast } from '../lib/toast'
 import { useCollection } from '../hooks/useCollection'
-import { WebsiteRoom } from '../lib/types'
+import { AppSettings, WebsiteRoom } from '../lib/types'
 import { exportFullBackup } from '../lib/xlsxExport'
 import RequireAdmin from '../components/RequireAdmin'
 import { Link } from 'react-router-dom'
+
+const DEFAULT_EXPENSE_ALERT_THRESHOLD = 550000
 
 export default function Settings(): React.JSX.Element {
   const { data: rooms } = useCollection<WebsiteRoom>('rooms')
   const totalCapacity = rooms.reduce((sum, r) => sum + (r.capacity || 0), 0)
   const totalOccupied = rooms.reduce((sum, r) => sum + (r.occupiedCount || 0), 0)
+
+  const { data: appSettings } = useCollection<AppSettings>('appSettings')
+  const expenseAlertThreshold =
+    appSettings.find((s) => s.id === 'dashboard')?.expenseAlertThreshold ??
+    DEFAULT_EXPENSE_ALERT_THRESHOLD
+  const [thresholdInput, setThresholdInput] = useState(String(expenseAlertThreshold))
+
+  async function saveExpenseAlertThreshold(e: FormEvent): Promise<void> {
+    e.preventDefault()
+    const value = Number(thresholdInput)
+    if (!thresholdInput || isNaN(value) || value <= 0) {
+      showToast('Enter a valid positive amount', 'error')
+      return
+    }
+    try {
+      await setDoc(doc(db, 'appSettings', 'dashboard'), { expenseAlertThreshold: value }, { merge: true })
+      showToast('Expense alert threshold updated')
+    } catch (err) {
+      console.error(err)
+      showToast('Failed to update threshold: ' + (err as Error).message, 'error')
+    }
+  }
 
   const [name, setName] = useState(getCurrentUserName())
   const [exporting, setExporting] = useState(false)
@@ -166,6 +192,29 @@ export default function Settings(): React.JSX.Element {
           {exporting ? 'Exporting…' : 'Export full backup'}
         </button>
       </div>
+
+      <form className="card" onSubmit={saveExpenseAlertThreshold}>
+        <div className="page-header" style={{ marginBottom: 12 }}>
+          <h1 style={{ fontSize: 16 }}>Expense alert threshold</h1>
+          <p>Dashboard shows a warning once this month's expenses (excluding Rent) cross this amount.</p>
+        </div>
+        <div className="form-field">
+          <label>Alert when expenses exceed (₹)</label>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={thresholdInput}
+            onChange={(e) => setThresholdInput(e.target.value)}
+          />
+          <span className="hint">Currently ₹{expenseAlertThreshold.toLocaleString()}</span>
+        </div>
+        <div className="form-actions">
+          <button type="submit" className="btn btn-primary">
+            Save threshold
+          </button>
+        </div>
+      </form>
 
       <div className="card">
         <div className="page-header" style={{ marginBottom: 12 }}>

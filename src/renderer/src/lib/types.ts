@@ -340,3 +340,19 @@ export interface MonthlyChecklist {
   month: string
   items: Partial<Record<string, ChecklistItemStatus>>
 }
+
+// Dismissal state for Dashboard alerts, one doc per month (doc id =
+// "YYYY-MM"). Dismissing is Admin-only; Supervisor can see but not clear it.
+export interface DashboardAlertState {
+  id?: string
+  month: string
+  expenseAlertDismissed?: boolean
+  dismissedBy?: string
+  dismissedAt?: string
+}
+
+// App-wide configurable settings, single doc (id "dashboard"). Admin-only to edit.
+export interface AppSettings {
+  id?: string
+  expenseAlertThreshold?: number
+}

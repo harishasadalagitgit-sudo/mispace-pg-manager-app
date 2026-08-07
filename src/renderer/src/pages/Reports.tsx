@@ -12,7 +12,11 @@ import { showToast } from '../lib/toast'
 // fall back to the coarse expenseType (website-native entries).
 function expenseCategory(e: WebsiteExpense): string {
   const match = e.notes?.match(/^Category:\s*([^—]+)/)
-  return match ? match[1].trim() : e.expenseType
+  if (!match) return e.expenseType
+  const category = match[1].trim()
+  // "Grocery" is just the fine-grained name for the same "Grocery Bills"
+  // bucket — merge them into one label instead of showing both.
+  return category === 'Grocery' ? 'Grocery Bills' : category
 }
 
 // Advance/security-deposit income is stored as paymentType "Others" with a
@@ -52,10 +56,20 @@ function lastDayOfMonth(monthValue: string): string {
 type ReportType = 'expense' | 'income'
 type ReportMode = 'month' | 'custom'
 
+// These categories are excluded from the Expense Report entirely (not shown
+// as a filter option, not counted in totals) — they don't need reporting
+// here even though they're still valid categories elsewhere in the app.
+const REPORT_EXCLUDED_EXPENSE_CATEGORIES = new Set(['Salary', 'Vegetable shop'])
+
 export default function Reports(): React.JSX.Element {
-  const { data: expenses, loading: expensesLoading } = useCollection<WebsiteExpense>('expenses')
+  const { data: allExpenses, loading: expensesLoading } = useCollection<WebsiteExpense>('expenses')
   const { data: incomingPayments, loading: incomeLoading } =
     useCollection<WebsiteIncomingPayment>('incomingPayments')
+
+  const expenses = useMemo(
+    () => allExpenses.filter((e) => !REPORT_EXCLUDED_EXPENSE_CATEGORIES.has(expenseCategory(e))),
+    [allExpenses]
+  )
 
   const [reportType, setReportType] = useState<ReportType>('expense')
   const [mode, setMode] = useState<ReportMode>('month')
@@ -71,6 +85,7 @@ export default function Reports(): React.JSX.Element {
     new Set()
   )
   const [excludedIncomeCategories, setExcludedIncomeCategories] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState('')
 
   const loading = reportType === 'expense' ? expensesLoading : incomeLoading
   const excludedCategories =
@@ -98,27 +113,37 @@ export default function Reports(): React.JSX.Element {
     })
   }
 
-  const filteredExpenses = useMemo(
-    () =>
-      expenses.filter((e) => {
-        if (excludedExpenseCategories.has(expenseCategory(e))) return false
-        if (fromDate && e.dateOfPayment < fromDate) return false
-        if (toDate && e.dateOfPayment > toDate) return false
-        return true
-      }),
-    [expenses, excludedExpenseCategories, fromDate, toDate]
-  )
+  const filteredExpenses = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return expenses.filter((e) => {
+      if (excludedExpenseCategories.has(expenseCategory(e))) return false
+      if (fromDate && e.dateOfPayment < fromDate) return false
+      if (toDate && e.dateOfPayment > toDate) return false
+      if (
+        q &&
+        !`${e.title} ${e.recipient} ${e.paidBy} ${e.notes || ''}`.toLowerCase().includes(q)
+      )
+        return false
+      return true
+    })
+  }, [expenses, excludedExpenseCategories, fromDate, toDate, search])
 
-  const filteredIncome = useMemo(
-    () =>
-      incomingPayments.filter((p) => {
-        if (excludedIncomeCategories.has(incomeCategory(p))) return false
-        if (fromDate && p.paymentDate < fromDate) return false
-        if (toDate && p.paymentDate > toDate) return false
-        return true
-      }),
-    [incomingPayments, excludedIncomeCategories, fromDate, toDate]
-  )
+  const filteredIncome = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return incomingPayments.filter((p) => {
+      if (excludedIncomeCategories.has(incomeCategory(p))) return false
+      if (fromDate && p.paymentDate < fromDate) return false
+      if (toDate && p.paymentDate > toDate) return false
+      if (
+        q &&
+        !`${p.title} ${p.residentName} ${p.payee} ${p.roomNum} ${p.notes || ''}`
+          .toLowerCase()
+          .includes(q)
+      )
+        return false
+      return true
+    })
+  }, [incomingPayments, excludedIncomeCategories, fromDate, toDate, search])
 
   const byType = useMemo(() => {
     const totals = new Map<string, { amount: number; count: number }>()
@@ -320,6 +345,17 @@ export default function Reports(): React.JSX.Element {
             </div>
           </>
         )}
+
+        <div className="form-field" style={{ flex: 1 }}>
+          <label>Search</label>
+          <input
+            placeholder={
+              reportType === 'expense' ? 'Title, recipient, paid by, notes…' : 'Title, resident, room, payee…'
+            }
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="card">

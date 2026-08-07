@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { db } from '../lib/firebase'
 import { useCollection } from '../hooks/useCollection'
 import { Booking, WebsiteEmployee, WebsiteEnquiry, WebsiteResident, WebsiteRoom } from '../lib/types'
+import { nextDueDate } from '../lib/rentCalc'
 import { showToast } from '../lib/toast'
 import { useAuth } from '../lib/auth'
 
@@ -53,6 +54,7 @@ export default function Directory(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>(initialTab)
   const [search, setSearch] = useState('')
   const [showContacted, setShowContacted] = useState(false)
+  const [showAllResidents, setShowAllResidents] = useState(false)
 
   const sortedRooms = useMemo(
     () => [...rooms].sort((a, b) => Number(a.roomNum) - Number(b.roomNum)),
@@ -62,6 +64,7 @@ export default function Directory(): React.JSX.Element {
   const filteredResidents = useMemo(() => {
     const q = search.trim().toLowerCase()
     return residents
+      .filter((r) => showAllResidents || (r.balanceAmount || 0) > 0)
       .filter(
         (r) =>
           !q ||
@@ -70,7 +73,7 @@ export default function Directory(): React.JSX.Element {
           r.mobileNumber?.includes(q)
       )
       .sort((a, b) => Number(a.roomNum) - Number(b.roomNum))
-  }, [residents, search])
+  }, [residents, search, showAllResidents])
 
   const pendingBookings = useMemo(
     () =>
@@ -202,6 +205,11 @@ export default function Directory(): React.JSX.Element {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        {tab === 'residents' && (
+          <button className="btn btn-secondary" onClick={() => setShowAllResidents(!showAllResidents)}>
+            {showAllResidents ? 'Show only pending balance' : 'Show all residents'}
+          </button>
+        )}
         {tab === 'enquiries' && (
           <button
             className="btn btn-secondary"
@@ -226,7 +234,11 @@ export default function Directory(): React.JSX.Element {
           (residentsLoading ? (
             <div className="empty-state">Loading…</div>
           ) : filteredResidents.length === 0 ? (
-            <div className="empty-state">No residents match this search.</div>
+            <div className="empty-state">
+              {showAllResidents
+                ? 'No residents match this search.'
+                : 'No residents with a pending balance match this search.'}
+            </div>
           ) : (
             <table>
               <thead>
@@ -238,6 +250,7 @@ export default function Directory(): React.JSX.Element {
                   <th>Joining date</th>
                   <th>Rent</th>
                   <th>Balance</th>
+                  <th>Next due</th>
                 </tr>
               </thead>
               <tbody>
@@ -250,6 +263,7 @@ export default function Directory(): React.JSX.Element {
                     <td>{r.joiningDate || '—'}</td>
                     <td>{r.rentAmount ? `₹${r.rentAmount}` : '—'}</td>
                     <td>{r.balanceAmount ? `₹${r.balanceAmount}` : '—'}</td>
+                    <td>{r.joiningDate ? nextDueDate(r.joiningDate) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -303,7 +317,6 @@ export default function Directory(): React.JSX.Element {
               <thead>
                 <tr>
                   <th>Room</th>
-                  <th>Floor</th>
                   <th>Occupied</th>
                   <th>Capacity</th>
                   <th>Status</th>
@@ -313,7 +326,6 @@ export default function Directory(): React.JSX.Element {
                 {filteredRooms.map((r) => (
                   <tr key={r.id}>
                     <td>{r.roomNum}</td>
-                    <td>{r.floor}</td>
                     <td>{r.occupiedCount}</td>
                     <td>
                       {role === 'admin' ? (
@@ -348,7 +360,6 @@ export default function Directory(): React.JSX.Element {
               <thead>
                 <tr>
                   <th>Room</th>
-                  <th>Floor</th>
                   <th>Capacity</th>
                   <th>Occupied</th>
                   <th>Vacant beds</th>
@@ -358,7 +369,6 @@ export default function Directory(): React.JSX.Element {
                 {filteredVacantRooms.map(({ room, vacantBedNums }) => (
                   <tr key={room.id}>
                     <td>{room.roomNum}</td>
-                    <td>{room.floor}</td>
                     <td>{room.capacity}</td>
                     <td>{room.capacity - vacantBedNums.length}</td>
                     <td>{vacantBedNums.map((b) => `Bed ${b}`).join(', ')}</td>
