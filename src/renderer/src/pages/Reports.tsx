@@ -56,20 +56,10 @@ function lastDayOfMonth(monthValue: string): string {
 type ReportType = 'expense' | 'income'
 type ReportMode = 'month' | 'custom'
 
-// These categories are excluded from the Expense Report entirely (not shown
-// as a filter option, not counted in totals) — they don't need reporting
-// here even though they're still valid categories elsewhere in the app.
-const REPORT_EXCLUDED_EXPENSE_CATEGORIES = new Set(['Salary', 'Vegetable shop'])
-
 export default function Reports(): React.JSX.Element {
-  const { data: allExpenses, loading: expensesLoading } = useCollection<WebsiteExpense>('expenses')
+  const { data: expenses, loading: expensesLoading } = useCollection<WebsiteExpense>('expenses')
   const { data: incomingPayments, loading: incomeLoading } =
     useCollection<WebsiteIncomingPayment>('incomingPayments')
-
-  const expenses = useMemo(
-    () => allExpenses.filter((e) => !REPORT_EXCLUDED_EXPENSE_CATEGORIES.has(expenseCategory(e))),
-    [allExpenses]
-  )
 
   const [reportType, setReportType] = useState<ReportType>('expense')
   const [mode, setMode] = useState<ReportMode>('month')
