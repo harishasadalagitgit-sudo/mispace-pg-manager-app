@@ -59,11 +59,13 @@ export default function Directory(): React.JSX.Element {
   }
 
   const requestedTab = searchParams.get('tab')
-  const initialTab = VALID_TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : 'residents'
+  let initialTab = VALID_TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : 'residents'
+  if (initialTab === 'employees' && role !== 'admin') initialTab = 'residents'
   const [tab, setTab] = useState<Tab>(initialTab)
   const [search, setSearch] = useState('')
   const [showContacted, setShowContacted] = useState(false)
   const [showAllResidents, setShowAllResidents] = useState(false)
+  const [showSalaryTotal, setShowSalaryTotal] = useState(false)
 
   const sortedRooms = useMemo(
     () => [...rooms].sort((a, b) => Number(a.roomNum) - Number(b.roomNum)),
@@ -156,6 +158,12 @@ export default function Directory(): React.JSX.Element {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [employees, search])
 
+  // Net salary still owed (salary minus any advance already taken this
+  // month), across active employees only.
+  const totalSalariesToPay = employees
+    .filter((e) => e.status === 'active')
+    .reduce((sum, e) => sum + Math.max(0, (e.salary || 0) - (e.advanceAmount || 0)), 0)
+
   const filteredEnquiries = useMemo(() => {
     const q = search.trim().toLowerCase()
     return enquiries
@@ -247,7 +255,7 @@ export default function Directory(): React.JSX.Element {
             <option value="bookings">Bookings (not moved in)</option>
             <option value="rooms">Rooms</option>
             <option value="vacant">Vacant rooms</option>
-            <option value="employees">Employees</option>
+            {role === 'admin' && <option value="employees">Employees</option>}
             <option value="enquiries">Enquiries</option>
           </select>
         </div>
@@ -271,6 +279,11 @@ export default function Directory(): React.JSX.Element {
             disabled={recalculating}
           >
             {recalculating ? 'Recalculating…' : 'Recalculate balances'}
+          </button>
+        )}
+        {tab === 'employees' && role === 'admin' && (
+          <button className="btn btn-secondary" onClick={() => setShowSalaryTotal(!showSalaryTotal)}>
+            {showSalaryTotal ? 'Hide salaries total' : 'Show salaries total'}
           </button>
         )}
         {tab === 'enquiries' && (
@@ -297,6 +310,13 @@ export default function Directory(): React.JSX.Element {
           ⚠ <strong>{residentsWithBalance.length}</strong> resident
           {residentsWithBalance.length === 1 ? '' : 's'} owe a total of{' '}
           <strong>₹{totalOutstandingBalance.toLocaleString()}</strong> in outstanding rent balance.
+        </div>
+      )}
+
+      {tab === 'employees' && role === 'admin' && showSalaryTotal && (
+        <div className="card" style={{ borderColor: 'var(--warning)' }}>
+          Total salaries to be paid (active employees, net of any advance already taken):{' '}
+          <strong>₹{totalSalariesToPay.toLocaleString()}</strong>
         </div>
       )}
 
@@ -450,6 +470,7 @@ export default function Directory(): React.JSX.Element {
           ))}
 
         {tab === 'employees' &&
+          role === 'admin' &&
           (employeesLoading ? (
             <div className="empty-state">Loading…</div>
           ) : filteredEmployees.length === 0 ? (
@@ -464,6 +485,9 @@ export default function Directory(): React.JSX.Element {
                   <th>Mobile</th>
                   <th>Status</th>
                   <th>Joining date</th>
+                  <th>Salary</th>
+                  <th>Advance taken</th>
+                  <th>To pay</th>
                 </tr>
               </thead>
               <tbody>
@@ -475,6 +499,9 @@ export default function Directory(): React.JSX.Element {
                     <td>{e.mobileNumber || '—'}</td>
                     <td>{e.status}</td>
                     <td>{e.joiningDate || '—'}</td>
+                    <td>{e.salary ? `₹${e.salary}` : '—'}</td>
+                    <td>{e.advanceAmount ? `₹${e.advanceAmount}` : '—'}</td>
+                    <td>₹{Math.max(0, (e.salary || 0) - (e.advanceAmount || 0))}</td>
                   </tr>
                 ))}
               </tbody>

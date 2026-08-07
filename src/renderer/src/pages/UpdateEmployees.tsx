@@ -4,7 +4,7 @@ import { db } from '../lib/firebase'
 import { useCollection } from '../hooks/useCollection'
 import { EditableEmployeeFields, EmployeeRole, EmploymentType, WebsiteEmployee } from '../lib/types'
 import { showToast } from '../lib/toast'
-import RequireAdmin from '../components/RequireAdmin'
+import { useAuth } from '../lib/auth'
 
 const ROLES: EmployeeRole[] = ['Cook', 'Cleaner', 'Security Guard', 'Manager', 'Other']
 const EMPLOYMENT_TYPES: EmploymentType[] = ['Permanent', 'Temporary']
@@ -31,6 +31,7 @@ function todayISODate(): string {
 }
 
 export default function UpdateEmployees(): React.JSX.Element {
+  const { role } = useAuth()
   const { data: employees } = useCollection<WebsiteEmployee>('employees')
 
   const [search, setSearch] = useState('')
@@ -134,10 +135,14 @@ export default function UpdateEmployees(): React.JSX.Element {
   }
 
   return (
-    <RequireAdmin>
+    <>
       <div className="page-header">
-        <h1>Update Employees</h1>
-        <p>Adds/edits write directly to the website's live employees database.</p>
+        <h1>Employees</h1>
+        <p>
+          {role === 'admin'
+            ? "Adds/edits write directly to the website's live employees database."
+            : 'View only — ask an Admin to add, edit, or remove an employee.'}
+        </p>
       </div>
 
       <div className="filter-bar card">
@@ -149,12 +154,14 @@ export default function UpdateEmployees(): React.JSX.Element {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <button className="btn btn-primary" onClick={openAdd}>
-          + Add employee
-        </button>
+        {role === 'admin' && (
+          <button className="btn btn-primary" onClick={openAdd}>
+            + Add employee
+          </button>
+        )}
       </div>
 
-      {isOpen && (
+      {role === 'admin' && isOpen && (
         <form className="card" onSubmit={handleSubmit} style={{ borderColor: 'var(--primary)' }}>
           <div className="page-header" style={{ marginBottom: 12 }}>
             <h1 style={{ fontSize: 16 }}>{editingId ? 'Edit employee' : 'New employee'}</h1>
@@ -296,12 +303,16 @@ export default function UpdateEmployees(): React.JSX.Element {
                   <td>{e.salary ? `₹${e.salary}` : '—'}</td>
                   <td>{e.status}</td>
                   <td>
-                    <button className="btn btn-secondary btn-sm" onClick={() => openEdit(e)}>
-                      Edit
-                    </button>{' '}
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(e)}>
-                      Remove
-                    </button>
+                    {role === 'admin' && (
+                      <>
+                        <button className="btn btn-secondary btn-sm" onClick={() => openEdit(e)}>
+                          Edit
+                        </button>{' '}
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(e)}>
+                          Remove
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -309,6 +320,6 @@ export default function UpdateEmployees(): React.JSX.Element {
           </table>
         )}
       </div>
-    </RequireAdmin>
+    </>
   )
 }
