@@ -113,7 +113,7 @@ export default function Dashboard(): React.JSX.Element {
     deskIncome.filter((e) => e.status === 'pending').length +
     deskExpense.filter((e) => e.status === 'pending').length
 
-  const totalCapacity = rooms.reduce((sum, r) => sum + (r.capacity || 0), 0)
+  const totalCapacity = rooms.reduce((sum, r) => sum + (r.capacity || 6), 0)
   const totalOccupied = rooms.reduce((sum, r) => sum + (r.occupiedCount || 0), 0)
   const pendingBookingsList = bookings.filter((b) => b.status === 'pending')
   const pendingBookingsCount = pendingBookingsList.length
@@ -132,20 +132,27 @@ export default function Dashboard(): React.JSX.Element {
       const reservedBeds = new Set(
         pendingBookings.filter((b) => b.roomNum === room.roomNum).map((b) => b.bedNum)
       )
-      const vacantBedNums = Array.from({ length: room.capacity }, (_, i) => i + 1).filter(
+      const vacantBedNums = Array.from({ length: room.capacity || 6 }, (_, i) => i + 1).filter(
         (b) => !occupiedBeds.has(b) && !reservedBeds.has(b)
       )
-      const allBeds = Array.from({ length: room.capacity }, (_, i) => i + 1).map((b) => ({
+      const reservedBedNums = Array.from({ length: room.capacity || 6 }, (_, i) => i + 1).filter(
+        (b) => reservedBeds.has(b)
+      )
+      const allBeds = Array.from({ length: room.capacity || 6 }, (_, i) => i + 1).map((b) => ({
         bedNum: b,
-        occupied: occupiedBeds.has(b) || reservedBeds.has(b)
+        status: occupiedBeds.has(b)
+          ? ('occupied' as const)
+          : reservedBeds.has(b)
+            ? ('reserved' as const)
+            : ('vacant' as const)
       }))
-      return { room, vacantBedNums, allBeds }
+      return { room, vacantBedNums, reservedBedNums, allBeds }
     })
 
     const groups = new Map<number, { totalVacantBeds: number; rooms: typeof roomsWithVacantBeds }>()
     for (const entry of roomsWithVacantBeds) {
-      if (entry.vacantBedNums.length === 0) continue
-      const capacity = entry.room.capacity
+      if (entry.vacantBedNums.length === 0 && entry.reservedBedNums.length === 0) continue
+      const capacity = entry.room.capacity || 6
       const group = groups.get(capacity) || { totalVacantBeds: 0, rooms: [] }
       group.totalVacantBeds += entry.vacantBedNums.length
       group.rooms.push(entry)
@@ -270,6 +277,16 @@ export default function Dashboard(): React.JSX.Element {
               </div>
             ))
           )}
+          {totalReservedByBookings > 0 && (
+            <div className="stat-card">
+              <div className="label">Booked beds</div>
+              <div className="value">{totalReservedByBookings}</div>
+              <span className="hint">
+                advance paid, not yet moved in — {totalReservedByBookings} bed
+                {totalReservedByBookings === 1 ? '' : 's'} reserved
+              </span>
+            </div>
+          )}
         </div>
 
         {showVacancies && vacancyBySharing.length > 0 && (
@@ -305,46 +322,64 @@ export default function Dashboard(): React.JSX.Element {
                           gap: 6
                         }}
                       >
-                        {allBeds.map(({ bedNum, occupied }) => (
-                          <div
-                            key={bedNum}
-                            style={{
-                              background: occupied ? 'var(--danger-bg)' : 'var(--success-bg)',
-                              border: `1px solid ${occupied ? 'var(--danger)' : 'var(--success)'}`,
-                              borderRadius: 8,
-                              padding: '4px 2px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: 2,
-                              minWidth: 0
-                            }}
-                          >
-                            <img
-                              src={bedIcon}
-                              alt="bed"
+                        {allBeds.map(({ bedNum, status }) => {
+                          const color =
+                            status === 'occupied'
+                              ? 'var(--danger)'
+                              : status === 'reserved'
+                                ? 'var(--warning)'
+                                : 'var(--success)'
+                          const bg =
+                            status === 'occupied'
+                              ? 'var(--danger-bg)'
+                              : status === 'reserved'
+                                ? 'var(--warning-bg)'
+                                : 'var(--success-bg)'
+                          const iconFilter =
+                            status === 'occupied'
+                              ? 'sepia(1) saturate(8) hue-rotate(310deg) brightness(0.9)'
+                              : status === 'reserved'
+                                ? 'sepia(1) saturate(6) hue-rotate(10deg) brightness(1)'
+                                : 'sepia(1) saturate(8) hue-rotate(80deg) brightness(0.9)'
+                          return (
+                            <div
+                              key={bedNum}
                               style={{
-                                width: '100%',
-                                maxWidth: 40,
-                                height: 28,
-                                objectFit: 'contain',
-                                filter: occupied
-                                  ? 'sepia(1) saturate(8) hue-rotate(310deg) brightness(0.9)'
-                                  : 'sepia(0.3) saturate(1.5) hue-rotate(80deg) brightness(1.05)'
-                              }}
-                            />
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 700,
-                                color: occupied ? 'var(--danger)' : 'var(--success)',
-                                whiteSpace: 'nowrap'
+                                background: bg,
+                                border: `1px solid ${color}`,
+                                borderRadius: 8,
+                                padding: '4px 2px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 2,
+                                minWidth: 0
                               }}
                             >
-                              Bed {bedNum}
-                            </span>
-                          </div>
-                        ))}
+                              <img
+                                src={bedIcon}
+                                alt="bed"
+                                style={{
+                                  width: '100%',
+                                  maxWidth: 40,
+                                  height: 28,
+                                  objectFit: 'contain',
+                                  filter: iconFilter
+                                }}
+                              />
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color,
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {status === 'reserved' ? 'Booked' : `Bed ${bedNum}`}
+                              </span>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   ))}

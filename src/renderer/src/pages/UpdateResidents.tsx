@@ -747,45 +747,78 @@ export default function UpdateResidents(): React.JSX.Element {
           filteredResidents.length === 0 ? (
             <div className="empty-state">No residents match this search.</div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Room</th>
-                  <th>Bed</th>
-                  <th>Mobile</th>
-                  <th>Rent</th>
-                  <th>Balance</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredResidents.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.name}</td>
-                    <td>{r.roomNum}</td>
-                    <td>{r.bedNum ?? '—'}</td>
-                    <td>{r.mobileNumber || '—'}</td>
-                    <td>{r.rentAmount ? `₹${r.rentAmount}` : '—'}</td>
-                    <td>{r.balanceAmount ? `₹${r.balanceAmount}` : '—'}</td>
-                    <td>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}>
-                        Edit
-                      </button>{' '}
-                      <button className="btn btn-secondary btn-sm" onClick={() => openMove(r)}>
-                        Move room
-                      </button>{' '}
-                      <button className="btn btn-danger btn-sm" onClick={() => handleVacate(r)}>
-                        Mark vacated
-                      </button>{' '}
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)}>
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            (() => {
+              const byRoom = new Map<string, typeof filteredResidents>()
+              filteredResidents.forEach((r) => {
+                const key = r.roomNum || 'Unassigned'
+                byRoom.set(key, [...(byRoom.get(key) || []), r])
+              })
+              const groups = Array.from(byRoom.entries()).sort(([a], [b]) => {
+                const an = Number(a)
+                const bn = Number(b)
+                if (isNaN(an) || isNaN(bn)) return a.localeCompare(b)
+                return an - bn
+              })
+
+              return groups.map(([roomNum, rows]) => (
+                <div key={roomNum} style={{ marginBottom: 18 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      background: 'var(--bg-secondary, #f1f2f4)',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      marginBottom: 8,
+                      fontWeight: 700,
+                      fontSize: 13
+                    }}
+                  >
+                    <span>Room {roomNum}</span>
+                    <span>
+                      {rows.length} resident{rows.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Bed</th>
+                        <th>Mobile</th>
+                        <th>Rent</th>
+                        <th>Balance</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.name}</td>
+                          <td>{r.bedNum ?? '—'}</td>
+                          <td>{r.mobileNumber || '—'}</td>
+                          <td>{r.rentAmount ? `₹${r.rentAmount}` : '—'}</td>
+                          <td>{r.balanceAmount ? `₹${r.balanceAmount}` : '—'}</td>
+                          <td>
+                            <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}>
+                              Edit
+                            </button>{' '}
+                            <button className="btn btn-secondary btn-sm" onClick={() => openMove(r)}>
+                              Move room
+                            </button>{' '}
+                            <button className="btn btn-danger btn-sm" onClick={() => handleVacate(r)}>
+                              Mark vacated
+                            </button>{' '}
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)}>
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))
+            })()
           )
         ) : filteredVacated.length === 0 ? (
           <div className="empty-state">No vacated residents recorded yet.</div>

@@ -131,7 +131,7 @@ export default function Directory(): React.JSX.Element {
         const reservedBeds = new Set(
           pendingBookings.filter((b) => b.roomNum === room.roomNum).map((b) => b.bedNum)
         )
-        const vacantBedNums = Array.from({ length: room.capacity }, (_, i) => i + 1).filter(
+        const vacantBedNums = Array.from({ length: room.capacity || 6 }, (_, i) => i + 1).filter(
           (b) => !occupiedBeds.has(b) && !reservedBeds.has(b)
         )
         return { room, vacantBedNums }
@@ -331,34 +331,67 @@ export default function Directory(): React.JSX.Element {
                 : 'No residents with a pending balance match this search.'}
             </div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Room</th>
-                  <th>Bed</th>
-                  <th>Mobile</th>
-                  <th>Joining date</th>
-                  <th>Rent</th>
-                  <th>Balance</th>
-                  <th>Next due</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredResidents.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.name}</td>
-                    <td>{r.roomNum}</td>
-                    <td>{r.bedNum ?? '—'}</td>
-                    <td>{r.mobileNumber || '—'}</td>
-                    <td>{r.joiningDate || '—'}</td>
-                    <td>{r.rentAmount ? `₹${r.rentAmount}` : '—'}</td>
-                    <td>{r.balanceAmount ? `₹${r.balanceAmount}` : '—'}</td>
-                    <td>{r.joiningDate ? nextDueDate(r.joiningDate) : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            (() => {
+              const byRoom = new Map<string, typeof filteredResidents>()
+              filteredResidents.forEach((r) => {
+                const key = r.roomNum || 'Unassigned'
+                byRoom.set(key, [...(byRoom.get(key) || []), r])
+              })
+              const groups = Array.from(byRoom.entries()).sort(([a], [b]) => {
+                const an = Number(a)
+                const bn = Number(b)
+                if (isNaN(an) || isNaN(bn)) return a.localeCompare(b)
+                return an - bn
+              })
+
+              return groups.map(([roomNum, rows]) => (
+                <div key={roomNum} style={{ marginBottom: 18 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      background: 'var(--bg-secondary, #f1f2f4)',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      marginBottom: 8,
+                      fontWeight: 700,
+                      fontSize: 13
+                    }}
+                  >
+                    <span>Room {roomNum}</span>
+                    <span>
+                      {rows.length} resident{rows.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Bed</th>
+                        <th>Mobile</th>
+                        <th>Joining date</th>
+                        <th>Rent</th>
+                        <th>Balance</th>
+                        <th>Next due</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.name}</td>
+                          <td>{r.bedNum ?? '—'}</td>
+                          <td>{r.mobileNumber || '—'}</td>
+                          <td>{r.joiningDate || '—'}</td>
+                          <td>{r.rentAmount ? `₹${r.rentAmount}` : '—'}</td>
+                          <td>{r.balanceAmount ? `₹${r.balanceAmount}` : '—'}</td>
+                          <td>{r.joiningDate ? nextDueDate(r.joiningDate) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))
+            })()
           ))}
 
         {tab === 'bookings' &&
@@ -460,8 +493,8 @@ export default function Directory(): React.JSX.Element {
                 {filteredVacantRooms.map(({ room, vacantBedNums }) => (
                   <tr key={room.id}>
                     <td>{room.roomNum}</td>
-                    <td>{room.capacity}</td>
-                    <td>{room.capacity - vacantBedNums.length}</td>
+                    <td>{room.capacity || 6}</td>
+                    <td>{(room.capacity || 6) - vacantBedNums.length}</td>
                     <td>{vacantBedNums.map((b) => `Bed ${b}`).join(', ')}</td>
                   </tr>
                 ))}

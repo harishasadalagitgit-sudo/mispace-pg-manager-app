@@ -76,6 +76,7 @@ export default function Reports(): React.JSX.Element {
   )
   const [excludedIncomeCategories, setExcludedIncomeCategories] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
+  const [groupByDate, setGroupByDate] = useState(true)
 
   const loading = reportType === 'expense' ? expensesLoading : incomeLoading
   const excludedCategories =
@@ -441,78 +442,195 @@ export default function Reports(): React.JSX.Element {
         )}
       </div>
 
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          marginBottom: 10
+        }}
+      >
+        <button
+          type="button"
+          className={groupByDate ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
+          onClick={() => setGroupByDate((v) => !v)}
+        >
+          {groupByDate ? 'Grouped by date' : 'No grouping'}
+        </button>
+      </div>
+
       <div className="card table-scroll">
         {reportType === 'expense' ? (
           filteredExpenses.length === 0 ? (
             <div className="empty-state">No line items in range.</div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Title</th>
-                  <th>Recipient</th>
-                  <th>Amount</th>
-                  <th>Mode</th>
-                  <th>Paid by</th>
+            (() => {
+              const sorted = filteredExpenses
+                .slice()
+                .sort((a, b) => (a.dateOfPayment < b.dateOfPayment ? 1 : -1))
+              const expenseRow = (e: (typeof sorted)[number], i: number, showDate: boolean) => (
+                <tr key={i}>
+                  {showDate && <td>{e.dateOfPayment}</td>}
+                  <td>{expenseCategory(e)}</td>
+                  <td>{e.title}</td>
+                  <td>{e.recipient}</td>
+                  <td>₹{e.amount}</td>
+                  <td>{e.paidInCash ? 'Cash' : 'Online'}</td>
+                  <td>{e.paidBy}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredExpenses
-                  .slice()
-                  .sort((a, b) => (a.dateOfPayment < b.dateOfPayment ? 1 : -1))
-                  .map((e, i) => (
-                    <tr key={i}>
-                      <td>{e.dateOfPayment}</td>
-                      <td>{expenseCategory(e)}</td>
-                      <td>{e.title}</td>
-                      <td>{e.recipient}</td>
-                      <td>₹{e.amount}</td>
-                      <td>{e.paidInCash ? 'Cash' : 'Online'}</td>
-                      <td>{e.paidBy}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+              )
+
+              if (!groupByDate) {
+                return (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>Recipient</th>
+                        <th>Amount</th>
+                        <th>Mode</th>
+                        <th>Paid by</th>
+                      </tr>
+                    </thead>
+                    <tbody>{sorted.map((e, i) => expenseRow(e, i, true))}</tbody>
+                  </table>
+                )
+              }
+
+              const byDate = new Map<string, typeof sorted>()
+              sorted.forEach((e) => {
+                byDate.set(e.dateOfPayment, [...(byDate.get(e.dateOfPayment) || []), e])
+              })
+
+              return Array.from(byDate.entries()).map(([date, rows]) => {
+                const subtotal = rows.reduce((s, r) => s + r.amount, 0)
+                return (
+                  <div key={date} style={{ marginBottom: 18 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        background: 'var(--bg-secondary, #f1f2f4)',
+                        borderRadius: 8,
+                        padding: '8px 12px',
+                        marginBottom: 8,
+                        fontWeight: 700,
+                        fontSize: 13
+                      }}
+                    >
+                      <span>{date}</span>
+                      <span>
+                        {rows.length} item{rows.length === 1 ? '' : 's'} · ₹
+                        {subtotal.toLocaleString()}
+                      </span>
+                    </div>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Title</th>
+                          <th>Recipient</th>
+                          <th>Amount</th>
+                          <th>Mode</th>
+                          <th>Paid by</th>
+                        </tr>
+                      </thead>
+                      <tbody>{rows.map((e, i) => expenseRow(e, i, false))}</tbody>
+                    </table>
+                  </div>
+                )
+              })
+            })()
           )
         ) : filteredIncome.length === 0 ? (
           <div className="empty-state">No line items in range.</div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Title</th>
-                <th>Resident</th>
-                <th>Room/Bed</th>
-                <th>Amount</th>
-                <th>Mode</th>
-                <th>Payee</th>
+          (() => {
+            const sorted = filteredIncome
+              .slice()
+              .sort((a, b) => (a.paymentDate < b.paymentDate ? 1 : -1))
+            const incomeRow = (p: (typeof sorted)[number], i: number, showDate: boolean) => (
+              <tr key={i}>
+                {showDate && <td>{p.paymentDate}</td>}
+                <td>{incomeCategory(p)}</td>
+                <td>{p.title}</td>
+                <td>{p.residentName}</td>
+                <td>
+                  {p.roomNum || '—'}
+                  {p.bedNum ? ` / Bed ${p.bedNum}` : ''}
+                </td>
+                <td>₹{p.amount}</td>
+                <td>{p.paidInCash ? 'Cash' : 'Online'}</td>
+                <td>{p.payee}</td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredIncome
-                .slice()
-                .sort((a, b) => (a.paymentDate < b.paymentDate ? 1 : -1))
-                .map((p, i) => (
-                  <tr key={i}>
-                    <td>{p.paymentDate}</td>
-                    <td>{incomeCategory(p)}</td>
-                    <td>{p.title}</td>
-                    <td>{p.residentName}</td>
-                    <td>
-                      {p.roomNum || '—'}
-                      {p.bedNum ? ` / Bed ${p.bedNum}` : ''}
-                    </td>
-                    <td>₹{p.amount}</td>
-                    <td>{p.paidInCash ? 'Cash' : 'Online'}</td>
-                    <td>{p.payee}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+            )
+
+            if (!groupByDate) {
+              return (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Title</th>
+                      <th>Resident</th>
+                      <th>Room/Bed</th>
+                      <th>Amount</th>
+                      <th>Mode</th>
+                      <th>Payee</th>
+                    </tr>
+                  </thead>
+                  <tbody>{sorted.map((p, i) => incomeRow(p, i, true))}</tbody>
+                </table>
+              )
+            }
+
+            const byDate = new Map<string, typeof sorted>()
+            sorted.forEach((p) => {
+              byDate.set(p.paymentDate, [...(byDate.get(p.paymentDate) || []), p])
+            })
+
+            return Array.from(byDate.entries()).map(([date, rows]) => {
+              const subtotal = rows.reduce((s, r) => s + r.amount, 0)
+              return (
+                <div key={date} style={{ marginBottom: 18 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      background: 'var(--bg-secondary, #f1f2f4)',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      marginBottom: 8,
+                      fontWeight: 700,
+                      fontSize: 13
+                    }}
+                  >
+                    <span>{date}</span>
+                    <span>
+                      {rows.length} item{rows.length === 1 ? '' : 's'} · ₹
+                      {subtotal.toLocaleString()}
+                    </span>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>Resident</th>
+                        <th>Room/Bed</th>
+                        <th>Amount</th>
+                        <th>Mode</th>
+                        <th>Payee</th>
+                      </tr>
+                    </thead>
+                    <tbody>{rows.map((p, i) => incomeRow(p, i, false))}</tbody>
+                  </table>
+                </div>
+              )
+            })
+          })()
         )}
       </div>
     </>

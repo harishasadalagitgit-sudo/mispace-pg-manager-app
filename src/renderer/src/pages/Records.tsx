@@ -91,6 +91,7 @@ export default function Records(): React.JSX.Element {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [search, setSearch] = useState('')
+  const [groupByDate, setGroupByDate] = useState(true)
 
   const fromDate = dateMode === 'month' ? `${month}-01` : dateMode === 'custom' ? customFrom : ''
   const toDate = dateMode === 'month' ? lastDayOfMonth(month) : dateMode === 'custom' ? customTo : ''
@@ -310,6 +311,18 @@ export default function Records(): React.JSX.Element {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+
+        <div className="form-field">
+          <label>Grouping</label>
+          <button
+            type="button"
+            className={groupByDate ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
+            onClick={() => setGroupByDate((v) => !v)}
+            style={{ height: 38 }}
+          >
+            {groupByDate ? 'Grouped by date' : 'No grouping'}
+          </button>
+        </div>
       </div>
 
       {editingIncome && (
@@ -513,85 +526,14 @@ export default function Records(): React.JSX.Element {
           filteredIncome.length === 0 ? (
             <div className="empty-state">No income records match these filters.</div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Date</th>
-                  <th>Amount</th>
-                  <th>Room/Bed</th>
-                  <th>Rent month</th>
-                  <th>Mode</th>
-                  <th>Paid to</th>
-                  <th>Paid by</th>
-                  <th>Status</th>
-                  <th>Entered by</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredIncome.map((e) => (
-                  <tr key={`${e.source}-${e.id}`}>
-                    <td>{e.source}</td>
-                    <td>{e.date}</td>
-                    <td>₹{e.amount}</td>
-                    <td>{e.roomBed}</td>
-                    <td>{e.rentMonth}</td>
-                    <td>{e.mode}</td>
-                    <td>{e.paidTo}</td>
-                    <td>{e.paidBy}</td>
-                    <td>
-                      <StatusPill status={e.status} />
-                    </td>
-                    <td>{e.enteredBy}</td>
-                    <td>
-                      {e.source === 'Desktop' && e.status === 'pending' && e.deskRow && (
-                        <>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setEditingIncome(e.deskRow!)}
-                          >
-                            Edit
-                          </button>{' '}
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => deleteEntry(e, 'income')}
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )
-        ) : filteredExpense.length === 0 ? (
-          <div className="empty-state">No expense records match these filters.</div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Source</th>
-                <th>Date</th>
-                <th>Category</th>
-                <th>Amount</th>
-                <th>Mode</th>
-                <th>Paid to</th>
-                <th>Paid by</th>
-                <th>Status</th>
-                <th>Entered by</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredExpense.map((e) => (
+            (() => {
+              const renderIncomeRow = (e: UnifiedIncomeRow, showDate: boolean) => (
                 <tr key={`${e.source}-${e.id}`}>
                   <td>{e.source}</td>
-                  <td>{e.date}</td>
-                  <td>{e.category}</td>
+                  {showDate && <td>{e.date}</td>}
                   <td>₹{e.amount}</td>
+                  <td>{e.roomBed}</td>
+                  <td>{e.rentMonth}</td>
                   <td>{e.mode}</td>
                   <td>{e.paidTo}</td>
                   <td>{e.paidBy}</td>
@@ -604,13 +546,13 @@ export default function Records(): React.JSX.Element {
                       <>
                         <button
                           className="btn btn-secondary btn-sm"
-                          onClick={() => setEditingExpense(e.deskRow!)}
+                          onClick={() => setEditingIncome(e.deskRow!)}
                         >
                           Edit
                         </button>{' '}
                         <button
                           className="btn btn-danger btn-sm"
-                          onClick={() => deleteEntry(e, 'expense')}
+                          onClick={() => deleteEntry(e, 'income')}
                         >
                           Delete
                         </button>
@@ -618,9 +560,195 @@ export default function Records(): React.JSX.Element {
                     )}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              )
+
+              if (!groupByDate) {
+                return (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Source</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Room/Bed</th>
+                        <th>Rent month</th>
+                        <th>Mode</th>
+                        <th>Paid to</th>
+                        <th>Paid by</th>
+                        <th>Status</th>
+                        <th>Entered by</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>{filteredIncome.map((e) => renderIncomeRow(e, true))}</tbody>
+                  </table>
+                )
+              }
+
+              const byDate = new Map<string, UnifiedIncomeRow[]>()
+              filteredIncome.forEach((e) => {
+                byDate.set(e.date, [...(byDate.get(e.date) || []), e])
+              })
+              const groups = Array.from(byDate.entries()).sort(([a], [b]) => (a < b ? 1 : -1))
+
+              return (
+                <>
+                  {groups.map(([date, rows]) => {
+                    const subtotal = rows.reduce((s, r) => s + r.amount, 0)
+                    return (
+                      <div key={date} style={{ marginBottom: 18 }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            background: 'var(--bg-secondary, #f1f2f4)',
+                            borderRadius: 8,
+                            padding: '8px 12px',
+                            marginBottom: 8,
+                            fontWeight: 700,
+                            fontSize: 13
+                          }}
+                        >
+                          <span>{date}</span>
+                          <span>
+                            {rows.length} record{rows.length === 1 ? '' : 's'} · ₹{subtotal.toLocaleString()}
+                          </span>
+                        </div>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Source</th>
+                              <th>Amount</th>
+                              <th>Room/Bed</th>
+                              <th>Rent month</th>
+                              <th>Mode</th>
+                              <th>Paid to</th>
+                              <th>Paid by</th>
+                              <th>Status</th>
+                              <th>Entered by</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>{rows.map((e) => renderIncomeRow(e, false))}</tbody>
+                        </table>
+                      </div>
+                    )
+                  })}
+                </>
+              )
+            })()
+          )
+        ) : filteredExpense.length === 0 ? (
+          <div className="empty-state">No expense records match these filters.</div>
+        ) : (
+          (() => {
+            const renderExpenseRow = (e: UnifiedExpenseRow, showDate: boolean) => (
+              <tr key={`${e.source}-${e.id}`}>
+                <td>{e.source}</td>
+                {showDate && <td>{e.date}</td>}
+                <td>{e.category}</td>
+                <td>₹{e.amount}</td>
+                <td>{e.mode}</td>
+                <td>{e.paidTo}</td>
+                <td>{e.paidBy}</td>
+                <td>
+                  <StatusPill status={e.status} />
+                </td>
+                <td>{e.enteredBy}</td>
+                <td>
+                  {e.source === 'Desktop' && e.status === 'pending' && e.deskRow && (
+                    <>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setEditingExpense(e.deskRow!)}
+                      >
+                        Edit
+                      </button>{' '}
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => deleteEntry(e, 'expense')}
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            )
+
+            if (!groupByDate) {
+              return (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Date</th>
+                      <th>Category</th>
+                      <th>Amount</th>
+                      <th>Mode</th>
+                      <th>Paid to</th>
+                      <th>Paid by</th>
+                      <th>Status</th>
+                      <th>Entered by</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>{filteredExpense.map((e) => renderExpenseRow(e, true))}</tbody>
+                </table>
+              )
+            }
+
+            const byDate = new Map<string, UnifiedExpenseRow[]>()
+            filteredExpense.forEach((e) => {
+              byDate.set(e.date, [...(byDate.get(e.date) || []), e])
+            })
+            const groups = Array.from(byDate.entries()).sort(([a], [b]) => (a < b ? 1 : -1))
+
+            return (
+              <>
+                {groups.map(([date, rows]) => {
+                  const subtotal = rows.reduce((s, r) => s + r.amount, 0)
+                  return (
+                    <div key={date} style={{ marginBottom: 18 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          background: 'var(--bg-secondary, #f1f2f4)',
+                          borderRadius: 8,
+                          padding: '8px 12px',
+                          marginBottom: 8,
+                          fontWeight: 700,
+                          fontSize: 13
+                        }}
+                      >
+                        <span>{date}</span>
+                        <span>
+                          {rows.length} record{rows.length === 1 ? '' : 's'} · ₹{subtotal.toLocaleString()}
+                        </span>
+                      </div>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Source</th>
+                            <th>Category</th>
+                            <th>Amount</th>
+                            <th>Mode</th>
+                            <th>Paid to</th>
+                            <th>Paid by</th>
+                            <th>Status</th>
+                            <th>Entered by</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>{rows.map((e) => renderExpenseRow(e, false))}</tbody>
+                      </table>
+                    </div>
+                  )
+                })}
+              </>
+            )
+          })()
         )}
       </div>
     </>
