@@ -289,6 +289,7 @@ export default function UpdateEmployees(): React.JSX.Element {
                 <th>Type</th>
                 <th>Mobile</th>
                 <th>Salary</th>
+                <th>Advance (this month)</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -301,6 +302,7 @@ export default function UpdateEmployees(): React.JSX.Element {
                   <td>{e.employmentType}</td>
                   <td>{e.mobileNumber || '—'}</td>
                   <td>{e.salary ? `₹${e.salary}` : '—'}</td>
+                  <td>{e.advanceAmount ? `₹${e.advanceAmount}` : '—'}</td>
                   <td>{e.status}</td>
                   <td>
                     {role === 'admin' && (

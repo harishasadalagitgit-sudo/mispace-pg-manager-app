@@ -298,7 +298,10 @@ export default function Reports(): React.JSX.Element {
               <input
                 type="radio"
                 checked={reportType === 'expense'}
-                onChange={() => setReportType('expense')}
+                onChange={() => {
+                  setReportType('expense')
+                  setSearch('')
+                }}
               />
               Expense
             </label>
@@ -349,29 +352,31 @@ export default function Reports(): React.JSX.Element {
           </>
         )}
 
-        <div className="form-field" style={{ flex: 1 }}>
-          <label>Search</label>
-          <input
-            placeholder={
-              reportType === 'expense' ? 'Title, recipient, paid by, notes…' : 'Title, resident, room, payee…'
-            }
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
       </div>
 
       <div className="card">
-        <div className="form-field" style={{ marginBottom: 12, maxWidth: 280 }}>
-          <label>Quick filter — isolate one category</label>
-          <select value={quickFilterValue} onChange={(e) => quickFilterCategory(e.target.value)}>
-            <option value="">All categories</option>
-            {allCategories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
+        <div className="filter-bar" style={{ padding: 0, marginBottom: 12 }}>
+          <div className="form-field" style={{ maxWidth: 280 }}>
+            <label>Quick filter — isolate one category</label>
+            <select value={quickFilterValue} onChange={(e) => quickFilterCategory(e.target.value)}>
+              <option value="">All categories</option>
+              {allCategories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </div>
+          {reportType === 'income' && (
+            <div className="form-field" style={{ flex: 1 }}>
+              <label>Search</label>
+              <input
+                placeholder="Title, resident, room, payee…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          )}
         </div>
         <div className="form-field full" style={{ marginBottom: 4 }}>
           <label>Type of {reportType}</label>

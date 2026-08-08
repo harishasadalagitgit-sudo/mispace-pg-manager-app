@@ -9,6 +9,8 @@ import { promptText } from '../lib/promptDialog'
 import { getCurrentUserName } from '../lib/session'
 import RequireAdmin from '../components/RequireAdmin'
 
+type SearchField = 'roomNum' | 'name' | 'mobileNumber'
+
 function todayISODate(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -63,6 +65,7 @@ export default function UpdateResidents(): React.JSX.Element {
 
   const [view, setView] = useState<View>('active')
   const [search, setSearch] = useState('')
+  const [searchField, setSearchField] = useState<SearchField>('roomNum')
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<EditableResidentFields>(EMPTY_FORM)
@@ -84,29 +87,28 @@ export default function UpdateResidents(): React.JSX.Element {
   const [restoreJoiningDate, setRestoreJoiningDate] = useState('')
   const [restoring, setRestoring] = useState(false)
 
+  function matchesSearchField(
+    r: { name?: string; roomNum?: string; mobileNumber?: string },
+    field: SearchField,
+    q: string
+  ): boolean {
+    if (!q) return true
+    if (field === 'name') return Boolean(r.name?.toLowerCase().includes(q))
+    if (field === 'mobileNumber') return Boolean(r.mobileNumber?.includes(q))
+    return Boolean(r.roomNum?.includes(q))
+  }
+
   const filteredResidents = useMemo(() => {
     const q = search.trim().toLowerCase()
     return residents
-      .filter(
-        (r) =>
-          !q ||
-          r.name?.toLowerCase().includes(q) ||
-          r.roomNum?.includes(q) ||
-          r.mobileNumber?.includes(q)
-      )
+      .filter((r) => matchesSearchField(r, searchField, q))
       .sort((a, b) => Number(a.roomNum) - Number(b.roomNum))
-  }, [residents, search])
+  }, [residents, search, searchField])
 
   const filteredVacated = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return vacatedResidents.filter(
-      (r) =>
-        !q ||
-        r.name?.toLowerCase().includes(q) ||
-        r.roomNum?.includes(q) ||
-        r.mobileNumber?.includes(q)
-    )
-  }, [vacatedResidents, search])
+    return vacatedResidents.filter((r) => matchesSearchField(r, searchField, q))
+  }, [vacatedResidents, search, searchField])
 
   const selectedRoom = sortedRooms.find((r) => r.roomNum === form.roomNum)
 
@@ -421,7 +423,7 @@ export default function UpdateResidents(): React.JSX.Element {
   return (
     <RequireAdmin>
       <div className="page-header">
-        <h1>Update Residents</h1>
+        <h1>Residents</h1>
         <p>
           {view === 'active'
             ? "Adds/edits write directly to the website's live residents database."
@@ -430,10 +432,24 @@ export default function UpdateResidents(): React.JSX.Element {
       </div>
 
       <div className="filter-bar card">
+        <div className="form-field">
+          <label>Search by</label>
+          <select value={searchField} onChange={(e) => setSearchField(e.target.value as SearchField)}>
+            <option value="roomNum">Room number</option>
+            <option value="name">Resident name</option>
+            <option value="mobileNumber">Mobile number</option>
+          </select>
+        </div>
         <div className="form-field" style={{ flex: 1 }}>
           <label>Search</label>
           <input
-            placeholder="Name, room, mobile…"
+            placeholder={
+              searchField === 'roomNum'
+                ? 'Room number…'
+                : searchField === 'name'
+                  ? 'Resident name…'
+                  : 'Mobile number…'
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

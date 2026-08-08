@@ -225,7 +225,7 @@ export default function Dashboard(): React.JSX.Element {
         <div className="stat-card">
           <div className="label">Vacant beds</div>
           <div className="value">{totalVacantBeds}</div>
-          <Link to="/directory" style={{ fontSize: 12 }}>
+          <Link to="/directory?tab=vacant" style={{ fontSize: 12 }}>
             View vacant rooms →
           </Link>
         </div>

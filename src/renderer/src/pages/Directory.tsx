@@ -486,7 +486,7 @@ export default function Directory(): React.JSX.Element {
                   <th>Status</th>
                   <th>Joining date</th>
                   <th>Salary</th>
-                  <th>Advance taken</th>
+                  <th>Advance (this month)</th>
                   <th>To pay</th>
                 </tr>
               </thead>
