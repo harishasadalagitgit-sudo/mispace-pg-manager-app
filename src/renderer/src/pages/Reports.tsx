@@ -103,6 +103,19 @@ export default function Reports(): React.JSX.Element {
     })
   }
 
+  // Quick single-category isolate — reflects "just one category checked" if
+  // that's the current state, otherwise shows the "All categories" placeholder.
+  const includedCategories = allCategories.filter((c) => !excludedCategories.has(c))
+  const quickFilterValue = includedCategories.length === 1 ? includedCategories[0] : ''
+
+  function quickFilterCategory(category: string): void {
+    if (!category) {
+      setExcludedCategories(new Set())
+    } else {
+      setExcludedCategories(new Set(allCategories.filter((c) => c !== category)))
+    }
+  }
+
   const filteredExpenses = useMemo(() => {
     const q = search.trim().toLowerCase()
     return expenses.filter((e) => {
@@ -349,6 +362,17 @@ export default function Reports(): React.JSX.Element {
       </div>
 
       <div className="card">
+        <div className="form-field" style={{ marginBottom: 12, maxWidth: 280 }}>
+          <label>Quick filter — isolate one category</label>
+          <select value={quickFilterValue} onChange={(e) => quickFilterCategory(e.target.value)}>
+            <option value="">All categories</option>
+            {allCategories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="form-field full" style={{ marginBottom: 4 }}>
           <label>Type of {reportType}</label>
         </div>
