@@ -4,6 +4,7 @@ import { hasSupervisorPassword } from '../lib/supervisorAuth'
 import { useAuth } from '../lib/auth'
 import { useCollection } from '../hooks/useCollection'
 import { AppSettings } from '../lib/types'
+import miLogo from '../assets/mi-logo.png'
 
 type Tab = 'supervisor' | 'admin'
 
@@ -66,9 +67,12 @@ export default function LoginScreen(): React.JSX.Element {
   if (settingsLoading) {
     return (
       <div className="lock-screen">
-        <div className="page-header">
-          <h1>MiSpace PG</h1>
-          <p>Loading…</p>
+        <div className="lock-screen-inner">
+          <img className="lock-screen-logo" src={miLogo} alt="MiSpace" />
+          <div className="page-header">
+            <h1>MiSpace PG</h1>
+            <p>Loading…</p>
+          </div>
         </div>
       </div>
     )
@@ -76,12 +80,14 @@ export default function LoginScreen(): React.JSX.Element {
 
   return (
     <div className="lock-screen">
-      <div className="page-header">
-        <h1>MiSpace PG</h1>
-        <p>Log in to continue.</p>
-      </div>
+      <div className="lock-screen-inner">
+        <img className="lock-screen-logo" src={miLogo} alt="MiSpace" />
+        <div className="page-header">
+          <h1>Staff Login</h1>
+          <p>Log in to continue.</p>
+        </div>
 
-      {!needsAdminSetup && (
+        {!needsAdminSetup && (
         <div className="radio-row" style={{ justifyContent: 'center', marginBottom: 16 }}>
           <button
             type="button"
@@ -185,6 +191,7 @@ export default function LoginScreen(): React.JSX.Element {
           </div>
         </form>
       )}
+      </div>
     </div>
   )
 }

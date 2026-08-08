@@ -361,7 +361,38 @@ tbody tr:hover {
 }
 
 .lock-screen {
-  max-width: 380px;
-  margin: 80px auto;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 40px 20px;
+  background: var(--bg) url('./app-bg.png') center / cover no-repeat fixed;
+}
+
+.lock-screen-inner {
+  max-width: 360px;
+  width: 100%;
   text-align: center;
+}
+
+.lock-screen-logo {
+  width: 140px;
+  height: 140px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 20px;
+  background: #fff;
+  padding: 8px;
+  border: 3px solid var(--warning);
+  box-shadow:
+    0 0 0 8px rgba(217, 119, 6, 0.12),
+    0 16px 36px rgba(0, 0, 0, 0.3);
+}
+
+.lock-screen-inner .card {
+  text-align: left;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
 }
