@@ -66,6 +66,7 @@ export default function Directory(): React.JSX.Element {
   const [showContacted, setShowContacted] = useState(false)
   const [showAllResidents, setShowAllResidents] = useState(false)
   const [showSalaryTotal, setShowSalaryTotal] = useState(false)
+  const [showEstimatedIncome, setShowEstimatedIncome] = useState(false)
 
   const sortedRooms = useMemo(
     () => [...rooms].sort((a, b) => Number(a.roomNum) - Number(b.roomNum)),
@@ -96,6 +97,25 @@ export default function Directory(): React.JSX.Element {
     (sum, r) => sum + (r.balanceAmount || 0),
     0
   )
+
+  // Estimated monthly rent income from currently occupied beds only — each
+  // active resident's rentAmount already reflects their room type's rent.
+  const estimatedIncomeByType = useMemo(() => {
+    const roomCapacityByNum = new Map(rooms.map((r) => [r.roomNum, r.capacity || 6]))
+    const groups = new Map<number, { count: number; total: number }>()
+    residents.forEach((r) => {
+      const capacity = roomCapacityByNum.get(r.roomNum) || 6
+      const g = groups.get(capacity) || { count: 0, total: 0 }
+      g.count += 1
+      g.total += r.rentAmount || 0
+      groups.set(capacity, g)
+    })
+    return Array.from(groups.entries())
+      .map(([capacity, g]) => ({ capacity, ...g }))
+      .sort((a, b) => a.capacity - b.capacity)
+  }, [residents, rooms])
+  const estimatedIncomeTotal = estimatedIncomeByType.reduce((sum, g) => sum + g.total, 0)
+  const estimatedIncomeOccupiedBeds = estimatedIncomeByType.reduce((sum, g) => sum + g.count, 0)
 
   const pendingBookings = useMemo(
     () =>
@@ -281,6 +301,14 @@ export default function Directory(): React.JSX.Element {
             {recalculating ? 'Recalculating…' : 'Recalculate balances'}
           </button>
         )}
+        {tab === 'residents' && (
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowEstimatedIncome(!showEstimatedIncome)}
+          >
+            {showEstimatedIncome ? 'Hide estimated income' : 'Show estimated income'}
+          </button>
+        )}
         {tab === 'employees' && role === 'admin' && (
           <button className="btn btn-secondary" onClick={() => setShowSalaryTotal(!showSalaryTotal)}>
             {showSalaryTotal ? 'Hide salaries total' : 'Show salaries total'}
@@ -310,6 +338,22 @@ export default function Directory(): React.JSX.Element {
           ⚠ <strong>{residentsWithBalance.length}</strong> resident
           {residentsWithBalance.length === 1 ? '' : 's'} owe a total of{' '}
           <strong>₹{totalOutstandingBalance.toLocaleString()}</strong> in outstanding rent balance.
+        </div>
+      )}
+
+      {tab === 'residents' && showEstimatedIncome && (
+        <div className="card" style={{ borderColor: 'var(--success)' }}>
+          <div style={{ marginBottom: estimatedIncomeByType.length > 0 ? 10 : 0 }}>
+            Estimated monthly rent income from <strong>{estimatedIncomeOccupiedBeds}</strong>{' '}
+            occupied bed{estimatedIncomeOccupiedBeds === 1 ? '' : 's'}:{' '}
+            <strong>₹{estimatedIncomeTotal.toLocaleString()}</strong>
+          </div>
+          {estimatedIncomeByType.map((g) => (
+            <div key={g.capacity} style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              {g.capacity}-sharing: {g.count} bed{g.count === 1 ? '' : 's'} × avg ₹
+              {Math.round(g.total / g.count).toLocaleString()} = ₹{g.total.toLocaleString()}
+            </div>
+          ))}
         </div>
       )}
 
