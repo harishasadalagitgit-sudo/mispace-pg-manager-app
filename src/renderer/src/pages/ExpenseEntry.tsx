@@ -4,6 +4,7 @@ import { db } from '../lib/firebase'
 import { DeskExpenseEntry, EXPENSE_CATEGORIES, ExpenseCategory, PaymentMode } from '../lib/types'
 import { getCurrentUserName } from '../lib/session'
 import { showToast } from '../lib/toast'
+import { writeWithOfflineFallback } from '../lib/offline'
 
 function todayISODate(): string {
   const d = new Date()
@@ -51,8 +52,12 @@ export default function ExpenseEntry(): React.JSX.Element {
         enteredAt: new Date().toISOString(),
         status: 'pending'
       }
-      await addDoc(collection(db, 'deskExpenseEntries'), entry)
-      showToast('Expense entry submitted for approval')
+      const result = await writeWithOfflineFallback(addDoc(collection(db, 'deskExpenseEntries'), entry))
+      showToast(
+        result === 'synced'
+          ? 'Expense entry submitted for approval'
+          : 'Saved offline — will sync automatically once you\'re back online'
+      )
       resetForm()
     } catch (err) {
       console.error(err)

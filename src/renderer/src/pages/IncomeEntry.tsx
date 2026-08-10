@@ -5,6 +5,7 @@ import { useCollection } from '../hooks/useCollection'
 import { DeskIncomeEntry, PaymentMode, WebsiteResident, WebsiteRoom } from '../lib/types'
 import { getCurrentUserName } from '../lib/session'
 import { showToast } from '../lib/toast'
+import { writeWithOfflineFallback } from '../lib/offline'
 
 function todayISODate(): string {
   const d = new Date()
@@ -96,8 +97,12 @@ export default function IncomeEntry(): React.JSX.Element {
         enteredAt: new Date().toISOString(),
         status: 'pending'
       }
-      await addDoc(collection(db, 'deskIncomeEntries'), entry)
-      showToast('Income entry submitted for approval')
+      const result = await writeWithOfflineFallback(addDoc(collection(db, 'deskIncomeEntries'), entry))
+      showToast(
+        result === 'synced'
+          ? 'Income entry submitted for approval'
+          : 'Saved offline — will sync automatically once you\'re back online'
+      )
       resetForm()
     } catch (err) {
       console.error(err)

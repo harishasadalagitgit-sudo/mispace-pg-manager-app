@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore } from 'firebase/firestore'
+import { initializeFirestore, persistentLocalCache, persistentSingleTabManager } from 'firebase/firestore'
 
 // Same Firebase project as the MiSpace PG website
 // (https://github.com/harishasadalagitgit-sudo/paying-guest-manager-2026)
@@ -14,4 +14,10 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
-export const db = getFirestore(app)
+
+// Persist reads/writes to IndexedDB — if the network drops mid-entry, the
+// write is queued on disk (survives an app restart, not just an in-memory
+// queue) and Firestore automatically retries it once connectivity returns.
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) })
+})

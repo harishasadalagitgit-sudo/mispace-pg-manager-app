@@ -5,6 +5,7 @@ import { DeskExpenseEntry, DeskIncomeEntry } from '../lib/types'
 import { getCurrentUserName, setCurrentUserName } from '../lib/session'
 import { promptText } from '../lib/promptDialog'
 import { useAuth } from '../lib/auth'
+import { useOnlineStatus } from '../lib/offline'
 import Toast from './Toast'
 import PromptDialogHost from './PromptDialogHost'
 
@@ -13,6 +14,7 @@ export default function Layout(): React.JSX.Element {
   const { data: expenseEntries } = useCollection<DeskExpenseEntry>('deskExpenseEntries')
   const { role, logout } = useAuth()
   const [userName, setUserName] = useState(getCurrentUserName())
+  const isOnline = useOnlineStatus()
 
   useEffect(() => {
     if (!userName) {
@@ -76,6 +78,20 @@ export default function Layout(): React.JSX.Element {
         </div>
       </aside>
       <main className="content">
+        {!isOnline && (
+          <div
+            className="card"
+            style={{
+              borderColor: 'var(--warning)',
+              background: 'var(--warning-bg)',
+              marginBottom: 16,
+              fontWeight: 600
+            }}
+          >
+            ⚠ You're offline — entries you save now are stored locally and will sync
+            automatically once your connection is back.
+          </div>
+        )}
         <Outlet />
       </main>
       <Toast />
