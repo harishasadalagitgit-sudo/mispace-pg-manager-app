@@ -57,14 +57,15 @@ export default function Layout(): React.JSX.Element {
           <NavLink to="/directory">Directory</NavLink>
           <NavLink to="/reports">Reports</NavLink>
           <NavLink to="/checklist">Checklist</NavLink>
+          <NavLink to="/cash-management">Cash Management</NavLink>
           <NavLink to="/update-employees">Employees</NavLink>
+          <NavLink to="/update-residents">Residents</NavLink>
           {role === 'admin' && (
             <>
               <NavLink to="/approvals">
                 <span>Approvals</span>
                 {pendingCount > 0 && <span className="badge">{pendingCount}</span>}
               </NavLink>
-              <NavLink to="/update-residents">Residents</NavLink>
               <NavLink to="/settings">Settings</NavLink>
             </>
           )}

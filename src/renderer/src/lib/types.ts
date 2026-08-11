@@ -274,6 +274,31 @@ export interface DeskExpenseEntry {
   linkedExpenseId?: string
 }
 
+// ── Daily cash management log ───────────────────────────────────────────────
+// A day's reconciliation of physical cash held by whichever supervisor is on
+// duty: what they started with (carried over + handed by management), what
+// came in as rent/advance paid in cash, what went out on cash expenses, and
+// what's handed back to management at the end of the day. Not tied to the
+// approval workflow — this is an internal reconciliation record, entered
+// directly by whoever is holding the cash that day.
+export interface CashManagementEntry {
+  id?: string
+  date: string // YYYY-MM-DD
+  supervisorName: string
+  managementPerson: string
+  cashFromManagement: number // handed to the supervisor today
+  cashFromIncome: number // rent/advance collected in cash today
+  cashCarriedForward: number // left over from the previous day, not yet returned
+  spentGroceries: number
+  spentVegetables: number
+  spentAdvanceReturn: number // cash paid out to return an advance/rent refund
+  spentOther: number
+  cashReturnedToManagement: number
+  remarks?: string
+  enteredBy: string
+  enteredAt: string // ISO timestamp
+}
+
 // ── Monthly recurring-expense checklist ─────────────────────────────────────
 // A reminder list (not tied to actual income/expense records) so Admin and
 // Supervisor don't forget recurring monthly payments. One Firestore doc per

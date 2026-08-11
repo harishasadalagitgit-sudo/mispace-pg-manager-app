@@ -12,6 +12,7 @@ import UpdateResidents from './pages/UpdateResidents'
 import UpdateEmployees from './pages/UpdateEmployees'
 import Reports from './pages/Reports'
 import Checklist from './pages/Checklist'
+import CashManagement from './pages/CashManagement'
 import Settings from './pages/Settings'
 import { AuthProvider, useAuth } from './lib/auth'
 
@@ -37,6 +38,7 @@ function AppRoutes(): React.JSX.Element {
           <Route path="update-employees" element={<UpdateEmployees />} />
           <Route path="reports" element={<Reports />} />
           <Route path="checklist" element={<Checklist />} />
+          <Route path="cash-management" element={<CashManagement />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

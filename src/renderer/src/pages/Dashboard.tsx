@@ -19,10 +19,17 @@ import { showToast } from '../lib/toast'
 import { useAuth } from '../lib/auth'
 import { Link } from 'react-router-dom'
 import bedIcon from '../assets/bedimageforicon.png'
+import { nextDueDate, daysOverdue } from '../lib/rentCalc'
 
 function currentMonthPrefix(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function toLocalISODate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate()
+  ).padStart(2, '0')}`
 }
 
 function isMonthEndReminderDay(): boolean {
@@ -55,6 +62,78 @@ export default function Dashboard(): React.JSX.Element {
   const { data: dashboardAlerts } = useCollection<DashboardAlertState>('dashboardAlerts')
 
   const [showVacancies, setShowVacancies] = useState(false)
+  const [showTodaysCollections, setShowTodaysCollections] = useState(false)
+
+  // Residents whose next rent due date falls within the next 3 days
+  // (today + 0..3) — e.g. today Aug 11 -> due dates Aug 11/12/13/14 qualify.
+  type CollectionFlag = 'darkgreen' | 'green' | 'yellow' | 'orange' | 'red'
+
+  const todaysCollections = useMemo(() => {
+    const today = new Date()
+    const todayStr = toLocalISODate(today)
+    const windowEnd = new Date(today)
+    windowEnd.setDate(windowEnd.getDate() + 3)
+    const windowEndStr = toLocalISODate(windowEnd)
+
+    return residents
+      .filter((r) => r.joiningDate && (r.balanceAmount || 0) > 0)
+      .map((r) => {
+        const overdueDays = daysOverdue(r.rentAmount || 0, r.balanceAmount || 0, r.joiningDate, today)
+        const rent = r.rentAmount || 0
+        const balance = r.balanceAmount || 0
+        // A balance that's an exact multiple of rent means nothing was paid
+        // toward the outstanding cycle(s) — a partial payment leaves a
+        // remainder. Only meaningful once they're actually overdue.
+        const fullyUnpaid = overdueDays > 0 && rent > 0 && balance % rent === 0
+
+        let flag: CollectionFlag
+        let action: string
+        if (overdueDays === 0) {
+          flag = 'darkgreen'
+          action = 'Send reminder — due date approaching'
+        } else if (overdueDays <= 7) {
+          // Small outstanding balance within the 1-week grace window isn't
+          // worth an escalated color — treat it like a reminder, not a warning.
+          flag = balance <= 2000 ? 'green' : 'yellow'
+          action = fullyUnpaid ? 'Warning — full rent not paid' : 'Warning — partial rent paid'
+        } else if (fullyUnpaid) {
+          flag = 'red'
+          action = 'Warning — full rent not paid'
+        } else {
+          flag = 'orange'
+          action = 'Warning — partial rent paid'
+        }
+
+        // Reminders (not yet due): the upcoming month's full rent.
+        // Fully unpaid last month: the full rent, since nothing was paid
+        // toward it. Partially paid last month: only the remainder still
+        // owed toward that cycle, not the full rent or the whole balance.
+        const minDue = overdueDays === 0 ? rent : fullyUnpaid ? rent : balance % rent
+
+        return {
+          resident: r,
+          due: nextDueDate(r.joiningDate, today),
+          overdueDays,
+          redFlag: overdueDays > 0,
+          flag,
+          action,
+          minDue
+        }
+      })
+      .filter(({ due, redFlag }) => redFlag || (due && due >= todayStr && due <= windowEndStr))
+      .sort((a, b) => {
+        const flagOrder: Record<CollectionFlag, number> = {
+          red: 0,
+          orange: 1,
+          yellow: 2,
+          green: 3,
+          darkgreen: 4
+        }
+        if (flagOrder[a.flag] !== flagOrder[b.flag]) return flagOrder[a.flag] - flagOrder[b.flag]
+        if (a.redFlag) return b.overdueDays - a.overdueDays
+        return a.due.localeCompare(b.due)
+      })
+  }, [residents])
 
   const month = currentMonthPrefix()
   const expenseAlertThreshold =
@@ -96,6 +175,11 @@ export default function Dashboard(): React.JSX.Element {
         .reduce((sum, e) => sum + (e.amount || 0), 0),
     [expenses, month]
   )
+
+  // Fixed building rent the PG itself pays — ₹4.5L/month, but 0 for
+  // June and July 2026 (before the lease started).
+  const BUILDING_RENT = 450000
+  const buildingRentForMonth = month < '2026-08' ? 0 : BUILDING_RENT
 
   // Total expenses (Rent, gas, rice bags, groceries, utility bills, employee
   // salaries, meat, eggs, curd, vegetables, and everything else) excluding
@@ -209,7 +293,12 @@ export default function Dashboard(): React.JSX.Element {
         </div>
         <div className="stat-card">
           <div className="label">Net this month</div>
-          <div className="value">₹{(monthIncome - monthExpense).toLocaleString()}</div>
+          <div className="value">
+            ₹{(monthIncome - monthExpenseExcludingRent - buildingRentForMonth).toLocaleString()}
+          </div>
+          {buildingRentForMonth > 0 && (
+            <span className="hint">Includes ₹{buildingRentForMonth.toLocaleString()} building rent</span>
+          )}
         </div>
         <div className="stat-card">
           <div className="label">Expenses excl. Rent this month</div>
@@ -250,7 +339,85 @@ export default function Dashboard(): React.JSX.Element {
             View enquiries →
           </Link>
         </div>
+        <div
+          className="stat-card"
+          onClick={() => setShowTodaysCollections((v) => !v)}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="label">Today's Collections</div>
+          <div className="value">{todaysCollections.length}</div>
+          <span style={{ fontSize: 12 }}>
+            {showTodaysCollections ? 'Hide list ↑' : 'Due in next 3 days →'}
+          </span>
+        </div>
       </div>
+
+      {showTodaysCollections && (
+        <div className="card table-scroll">
+          <div className="page-header" style={{ marginBottom: 12 }}>
+            <h1 style={{ fontSize: 16 }}>Hostel Fee Overdue Alarms and Friendly Reminders</h1>
+            <p>
+              Next due between today and {toLocalISODate(new Date(Date.now() + 3 * 86400000))}, or
+              already owing more than a full month's rent — follow up for collection.
+            </p>
+          </div>
+          {todaysCollections.length === 0 ? (
+            <div className="empty-state">Nobody with an outstanding balance is due in this window.</div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Flag</th>
+                  <th>Next due</th>
+                  <th>Name</th>
+                  <th>Room</th>
+                  <th>Bed</th>
+                  <th>Rent</th>
+                  <th>Balance</th>
+                  <th>Min. amount to pay</th>
+                  <th>Mobile</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {todaysCollections.map(({ resident: r, due, flag, action, overdueDays, minDue }) => {
+                  const flagColors: Record<string, { bg: string; text: string; dot: string }> = {
+                    red: { bg: 'var(--danger-bg)', text: 'var(--danger)', dot: '🔴' },
+                    orange: { bg: '#fff4e5', text: '#c2660c', dot: '🟠' },
+                    yellow: { bg: '#fff9db', text: '#8a6d00', dot: '🟡' },
+                    green: { bg: '#f0fdf4', text: '#16a34a', dot: '🟢' },
+                    darkgreen: { bg: '#dcfce7', text: '#166534', dot: '🟢' }
+                  }
+                  const c = flagColors[flag]
+                  return (
+                    <tr key={r.id} style={{ background: c.bg }}>
+                      <td>{c.dot}</td>
+                      <td>{due}</td>
+                      <td>{r.name}</td>
+                      <td>{r.roomNum}</td>
+                      <td>{r.bedNum ?? '—'}</td>
+                      <td>{r.rentAmount ? `₹${r.rentAmount}` : '—'}</td>
+                      <td>{r.balanceAmount ? `₹${r.balanceAmount}` : '—'}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        {/* Reminders (dark green): next month's rent, not yet due.
+                            Alarms (green/yellow/orange/red): full rent if last
+                            month was fully unpaid, or just the remaining
+                            partial amount if some of it was already paid. */}
+                        {minDue ? `₹${minDue}` : '—'}
+                      </td>
+                      <td>{r.mobileNumber || '—'}</td>
+                      <td style={{ color: c.text, fontWeight: 600 }}>
+                        {action}
+                        {overdueDays > 0 && ` (${overdueDays}d)`}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

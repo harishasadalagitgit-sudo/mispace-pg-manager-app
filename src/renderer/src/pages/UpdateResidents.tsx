@@ -7,7 +7,7 @@ import { recalculateRoomOccupancy } from '../lib/occupancy'
 import { showToast } from '../lib/toast'
 import { promptText } from '../lib/promptDialog'
 import { getCurrentUserName } from '../lib/session'
-import RequireAdmin from '../components/RequireAdmin'
+import { useAuth } from '../lib/auth'
 
 type SearchField = 'roomNum' | 'name' | 'mobileNumber'
 
@@ -39,6 +39,7 @@ const EMPTY_FORM: EditableResidentFields = {
 type View = 'active' | 'vacated'
 
 export default function UpdateResidents(): React.JSX.Element {
+  const { role } = useAuth()
   const {
     data: residents,
     loading: residentsLoading,
@@ -421,13 +422,15 @@ export default function UpdateResidents(): React.JSX.Element {
   }
 
   return (
-    <RequireAdmin>
+    <>
       <div className="page-header">
         <h1>Residents</h1>
         <p>
-          {view === 'active'
-            ? "Adds/edits write directly to the website's live residents database."
-            : 'Residents who have moved out, kept for record.'}
+          {role !== 'admin'
+            ? 'View only — ask an Admin to add, edit, move, or vacate a resident.'
+            : view === 'active'
+              ? "Adds/edits write directly to the website's live residents database."
+              : 'Residents who have moved out, kept for record.'}
         </p>
       </div>
 
@@ -463,22 +466,31 @@ export default function UpdateResidents(): React.JSX.Element {
         >
           {view === 'active' ? 'View vacated residents' : 'Back to active residents'}
         </button>
-        {view === 'active' && (
+        {view === 'active' && role === 'admin' && (
           <button className="btn btn-primary" onClick={openAdd}>
             + Add resident
           </button>
         )}
       </div>
 
-      {view === 'active' && isOpen && (
+      {view === 'active' && isOpen && (() => {
+        const readOnly = role !== 'admin'
+        return (
         <form className="card" onSubmit={handleSubmit} style={{ borderColor: 'var(--primary)' }}>
           <div className="page-header" style={{ marginBottom: 12 }}>
-            <h1 style={{ fontSize: 16 }}>{editingId ? 'Edit resident' : 'New resident'}</h1>
+            <h1 style={{ fontSize: 16 }}>
+              {readOnly ? 'Resident details' : editingId ? 'Edit resident' : 'New resident'}
+            </h1>
           </div>
           <div className="form-grid">
             <div className="form-field">
               <label>Name</label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+                disabled={readOnly}
+              />
             </div>
             <div className="form-field">
               <label>Mobile number</label>
@@ -486,6 +498,7 @@ export default function UpdateResidents(): React.JSX.Element {
                 value={form.mobileNumber}
                 onChange={(e) => setForm({ ...form, mobileNumber: e.target.value })}
                 required
+                disabled={readOnly}
               />
             </div>
             <div className="form-field">
@@ -494,6 +507,7 @@ export default function UpdateResidents(): React.JSX.Element {
                 value={form.whatsappNumber}
                 onChange={(e) => setForm({ ...form, whatsappNumber: e.target.value })}
                 placeholder="Same as mobile if left blank"
+                disabled={readOnly}
               />
             </div>
             <div className="form-field">
@@ -501,6 +515,7 @@ export default function UpdateResidents(): React.JSX.Element {
               <input
                 value={form.emergencyContact}
                 onChange={(e) => setForm({ ...form, emergencyContact: e.target.value })}
+                disabled={readOnly}
               />
             </div>
 
@@ -510,6 +525,7 @@ export default function UpdateResidents(): React.JSX.Element {
                 value={form.roomNum}
                 onChange={(e) => setForm({ ...form, roomNum: e.target.value, bedNum: null })}
                 required
+                disabled={readOnly}
               >
                 <option value="">Select room</option>
                 {sortedRooms.map((r) => (
@@ -524,7 +540,7 @@ export default function UpdateResidents(): React.JSX.Element {
               <select
                 value={form.bedNum ?? ''}
                 onChange={(e) => setForm({ ...form, bedNum: e.target.value ? Number(e.target.value) : null })}
-                disabled={!selectedRoom}
+                disabled={readOnly || !selectedRoom}
               >
                 <option value="">Unassigned</option>
                 {selectedRoom &&
@@ -538,7 +554,12 @@ export default function UpdateResidents(): React.JSX.Element {
 
             <div className="form-field">
               <label>Date of birth</label>
-              <input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+              <input
+                type="date"
+                value={form.dob}
+                onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                disabled={readOnly}
+              />
             </div>
             <div className="form-field">
               <label>Joining date</label>
@@ -546,6 +567,7 @@ export default function UpdateResidents(): React.JSX.Element {
                 type="date"
                 value={form.joiningDate}
                 onChange={(e) => setForm({ ...form, joiningDate: e.target.value })}
+                disabled={readOnly}
               />
             </div>
 
@@ -554,6 +576,7 @@ export default function UpdateResidents(): React.JSX.Element {
               <input
                 value={form.currentWorkingCompanyOrCollege}
                 onChange={(e) => setForm({ ...form, currentWorkingCompanyOrCollege: e.target.value })}
+                disabled={readOnly}
               />
             </div>
             <div className="form-field">
@@ -562,6 +585,7 @@ export default function UpdateResidents(): React.JSX.Element {
                 type="number"
                 value={form.rentAmount}
                 onChange={(e) => setForm({ ...form, rentAmount: Number(e.target.value) })}
+                disabled={readOnly}
               />
             </div>
             <div className="form-field">
@@ -570,6 +594,7 @@ export default function UpdateResidents(): React.JSX.Element {
                 type="number"
                 value={form.securityDeposit}
                 onChange={(e) => setForm({ ...form, securityDeposit: Number(e.target.value) })}
+                disabled={readOnly}
               />
             </div>
             <div className="form-field">
@@ -578,6 +603,7 @@ export default function UpdateResidents(): React.JSX.Element {
                 type="number"
                 value={form.balanceAmount}
                 onChange={(e) => setForm({ ...form, balanceAmount: Number(e.target.value) })}
+                disabled={readOnly}
               />
             </div>
 
@@ -587,6 +613,7 @@ export default function UpdateResidents(): React.JSX.Element {
                 rows={2}
                 value={form.permanentAddress}
                 onChange={(e) => setForm({ ...form, permanentAddress: e.target.value })}
+                disabled={readOnly}
               />
             </div>
             <div className="form-field full">
@@ -595,6 +622,7 @@ export default function UpdateResidents(): React.JSX.Element {
                 value={form.parentsInformation}
                 onChange={(e) => setForm({ ...form, parentsInformation: e.target.value })}
                 placeholder="e.g. Father: Kumar, Mother: Rita"
+                disabled={readOnly}
               />
             </div>
             <div className="form-field full">
@@ -603,20 +631,30 @@ export default function UpdateResidents(): React.JSX.Element {
                 rows={2}
                 value={form.specialNotes}
                 onChange={(e) => setForm({ ...form, specialNotes: e.target.value })}
+                disabled={readOnly}
               />
             </div>
           </div>
 
           <div className="form-actions">
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Saving…' : editingId ? 'Save changes' : 'Add resident'}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={closeForm}>
-              Cancel
-            </button>
+            {readOnly ? (
+              <button type="button" className="btn btn-secondary" onClick={closeForm}>
+                Close
+              </button>
+            ) : (
+              <>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? 'Saving…' : editingId ? 'Save changes' : 'Add resident'}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={closeForm}>
+                  Cancel
+                </button>
+              </>
+            )}
           </div>
         </form>
-      )}
+        )
+      })()}
 
       {view === 'active' && movingResident && (
         <form className="card" onSubmit={handleMoveSubmit} style={{ borderColor: 'var(--primary)' }}>
@@ -793,24 +831,45 @@ export default function UpdateResidents(): React.JSX.Element {
                     <tbody>
                       {rows.map((r) => (
                         <tr key={r.id}>
-                          <td>{r.name}</td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => openEdit(r)}
+                              className="link-button"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                color: 'var(--primary)',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                font: 'inherit'
+                              }}
+                            >
+                              {r.name}
+                            </button>
+                          </td>
                           <td>{r.bedNum ?? '—'}</td>
                           <td>{r.mobileNumber || '—'}</td>
                           <td>{r.rentAmount ? `₹${r.rentAmount}` : '—'}</td>
                           <td>{r.balanceAmount ? `₹${r.balanceAmount}` : '—'}</td>
                           <td>
-                            <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}>
-                              Edit
-                            </button>{' '}
-                            <button className="btn btn-secondary btn-sm" onClick={() => openMove(r)}>
-                              Move room
-                            </button>{' '}
-                            <button className="btn btn-danger btn-sm" onClick={() => handleVacate(r)}>
-                              Mark vacated
-                            </button>{' '}
-                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)}>
-                              Delete
-                            </button>
+                            {role === 'admin' && (
+                              <>
+                                <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}>
+                                  Edit
+                                </button>{' '}
+                                <button className="btn btn-secondary btn-sm" onClick={() => openMove(r)}>
+                                  Move room
+                                </button>{' '}
+                                <button className="btn btn-danger btn-sm" onClick={() => handleVacate(r)}>
+                                  Mark vacated
+                                </button>{' '}
+                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)}>
+                                  Delete
+                                </button>
+                              </>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -850,9 +909,11 @@ export default function UpdateResidents(): React.JSX.Element {
                   <td>{r.vacatedBy}</td>
                   <td>{r.reason || '—'}</td>
                   <td>
-                    <button className="btn btn-primary btn-sm" onClick={() => openRestore(r)}>
-                      Restore to room
-                    </button>
+                    {role === 'admin' && (
+                      <button className="btn btn-primary btn-sm" onClick={() => openRestore(r)}>
+                        Restore to room
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -860,6 +921,6 @@ export default function UpdateResidents(): React.JSX.Element {
           </table>
         )}
       </div>
-    </RequireAdmin>
+    </>
   )
 }
